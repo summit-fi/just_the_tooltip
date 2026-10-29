@@ -218,7 +218,7 @@ class _JustTheTooltipOverlayState extends JustTheTooltipState<OverlayEntry> {
       }
 
       setState(
-            () {
+        () {
           // In the case of a modal, we enter a skrim overlay to catch taps
           if (widget.isModal) {
             entry = entryOverlay;
@@ -411,20 +411,15 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
 
     _hasBindingListeners = true;
 
-    // Listen to see when a mouse is added.
-    RendererBinding.instance.mouseTracker
-        .addListener(_handleMouseTrackerChange);
-    // Listen to global pointer events so that we can hide a tooltip immediately
-    // if some other control is clicked on.
-    GestureBinding.instance.pointerRouter.addGlobalRoute(_handlePointerEvent);
+    // Listens to see when a mouse is added and to global pointer events, so
+    // that we can hide a tooltip immediately if some other control is clicked
+    // on. Through _TooltipBindings: one listener for all the tooltips.
+    _TooltipBindings.add(this);
   }
 
   void _removeBindingListeners() {
     if (_hasBindingListeners) _hasBindingListeners = false;
-    RendererBinding.instance.mouseTracker
-        .removeListener(_handleMouseTrackerChange);
-    GestureBinding.instance.pointerRouter
-        .removeGlobalRoute(_handlePointerEvent);
+    _TooltipBindings.remove(this);
   }
 
   void _handleMouseTrackerChange() {
@@ -824,5 +819,42 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
       updatedTarget ?? target,
       offsetToTarget,
     );
+  }
+}
+
+/// One mouse tracker listener and one global pointer route for all the
+/// tooltips.
+abstract final class _TooltipBindings {
+  static final _tooltips = <JustTheTooltipState<Object?>>{};
+
+  static void add(JustTheTooltipState<Object?> tooltip) {
+    final isFirst = _tooltips.isEmpty;
+    _tooltips.add(tooltip);
+    if (!isFirst) return;
+
+    RendererBinding.instance.mouseTracker
+        .addListener(_handleMouseTrackerChange);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_handlePointerEvent);
+  }
+
+  static void remove(JustTheTooltipState<Object?> tooltip) {
+    if (!_tooltips.remove(tooltip) || _tooltips.isNotEmpty) return;
+
+    RendererBinding.instance.mouseTracker
+        .removeListener(_handleMouseTrackerChange);
+    GestureBinding.instance.pointerRouter
+        .removeGlobalRoute(_handlePointerEvent);
+  }
+
+  static void _handleMouseTrackerChange() {
+    for (final tooltip in _tooltips.toList()) {
+      tooltip._handleMouseTrackerChange();
+    }
+  }
+
+  static void _handlePointerEvent(PointerEvent event) {
+    for (final tooltip in _tooltips.toList()) {
+      if (tooltip.hasEntry) tooltip._handlePointerEvent(event);
+    }
   }
 }
