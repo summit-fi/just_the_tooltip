@@ -317,7 +317,7 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
       TooltipTriggerMode.longPress;
   static const bool _defaultEnableFeedback = true;
 
-  late final AnimationController _animationController;
+  AnimationController? _lazyAnimationController;
   Timer? _hideTimer;
   Timer? _showTimer;
   late Duration showDuration;
@@ -353,14 +353,19 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
       _addBindingListeners();
     }
 
-    _animationController = AnimationController(
+    _controller = widget.controller ?? JustTheController();
+    _attachController(_controller);
+  }
+
+  AnimationController get _animationController =>
+      _lazyAnimationController ??= _createAnimationController();
+
+  AnimationController _createAnimationController() {
+    return AnimationController(
       duration: widget.fadeInDuration,
       reverseDuration: widget.fadeOutDuration,
       vsync: this,
     )..addStatusListener(_handleStatusChanged);
-
-    _controller = widget.controller ?? JustTheController();
-    _attachController(_controller);
   }
 
   /// This sucker just gives the controller the newest versions of the
@@ -467,14 +472,14 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
 
     if (_pressActivated) {
       _hideTimer ??= Timer(showDuration, () async {
-        await _animationController.reverse();
+        await _lazyAnimationController?.reverse();
         completer.complete();
       });
     } else {
       _hideTimer ??= Timer(
         hoverShowDuration,
         () async {
-          await _animationController.reverse();
+          await _lazyAnimationController?.reverse();
           completer.complete();
         },
       );
@@ -567,7 +572,7 @@ abstract class JustTheTooltipState<T> extends State<JustTheInterface>
       _removeBindingListeners();
     }
 
-    _animationController.dispose();
+    _lazyAnimationController?.dispose();
 
     /// If we've made our own controller because the user's is null, we need to
     /// dispose of it.
